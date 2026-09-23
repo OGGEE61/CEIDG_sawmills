@@ -32,3 +32,16 @@ This project provides tools to fetch, process, and visualize data about active s
    python serve.py
    ```
    Then navigate to `http://localhost:8000/index.html`.
+
+## Technical Details
+
+**CEIDG API v3 Data Sourcing:**
+* The script targets the `/firmy` endpoint to get a list of candidate companies using specific PKD codes (e.g., 1610Z = 2007 standard, 1611Z = 2025 standard).
+* It then uses the `/firma` endpoint to fetch detailed data. This endpoint has a hidden limit of maximum 5 IDs per request, which the script handles by batching requests.
+* Only companies whose *main* PKD code (pkdGlowny) matches the target list are saved.
+* **Rate Limiting**: The API allows 50 requests / 3 minutes and 1000 requests / 60 minutes. The script waits ~3.7 seconds between requests to safely stay under limits. If a 403 or 429 is encountered, it sleeps for 185 seconds.
+* **Resilience**:
+  * State is continuously saved to `ceidg_state.json`. If interrupted (e.g. `Ctrl+C`), you can safely restart it to resume without duplicating work.
+  * Server errors (5xx) are retried up to 5 times with exponential backoff.
+  * Duplicate filtering runs on IDs present in both the state file and the CSV.
+* **Data Flattening**: The nested JSON data from the API is flattened into dot-notation columns (e.g., `detail.adresDzialalnosci.wojewodztwo`) for easier visualization in the CSV. Long arrays are dumped as JSON strings.

@@ -8,38 +8,8 @@ import pandas as pd
 import requests
 
 
-# ============================================================
-# CEIDG v3 - pobieranie firm z określonym PKD
-# ============================================================
-#
-# Schemat:
-#   /firmy?pkd=...&status=AKTYWNY
-#       -> lista kandydatów + ID
-#   /firma?ids=ID1&ids=ID2&...
-#       -> szczegóły wielu firm w jednym request
-#   -> sprawdzenie pkdGlowny
-#   -> zapis do CSV
-#
-# Skrypt zapisuje stan na bieżąco, więc można go przerwać
-# (Ctrl+C) i uruchomić ponownie.
-#
-# Wymagania:
-#   pip install requests pandas
-#
-# Token najlepiej ustawić jako zmienną środowiskową:
-#   Windows PowerShell:
-#       $env:CEIDG_TOKEN="TWÓJ_TOKEN"
-#
-#   macOS/Linux:
-#       export CEIDG_TOKEN="TWÓJ_TOKEN"
-#
-# albo wpisz token bezpośrednio w TOKEN poniżej.
-# ============================================================
 
 
-# -------------------------
-# KONFIGURACJA
-# -------------------------
 
 TOKEN = os.getenv("CEIDG_TOKEN", "eyJraWQiOiJjZWlkZyIsImFsZyI6IkhTNTEyIn0.eyJnaXZlbl9uYW1lIjoiTWF4IiwicGVzZWwiOiI5OTAyMDIxMDY1MiIsImlhdCI6MTc5MDA2NTQ5NSwiZmFtaWx5X25hbWUiOiJTenBlcmxpxYRza2kiLCJjbGllbnRfaWQiOiJVU0VSLTk5MDIwMjEwNjUyLU1BWC1TWlBFUkxJxYNTS0kifQ.mswywrHBcFHUl_f1YHJPZaRyG0riNcaX4KNE862VsOx98jvg_CGlKGxreKZUiExipn9xvNmZeo5kxtp2KrdUZA")
 
@@ -47,16 +17,8 @@ BASE_URL = "https://dane.biznes.gov.pl/api/ceidg/v3"
 FIRMY_URL = f"{BASE_URL}/firmy"
 FIRMA_URL = f"{BASE_URL}/firma"
 
-# PKD używane do wyszukania kandydatów.
-# 1610Z = PKD 2007: Produkcja wyrobów tartacznych
-# 1611Z = PKD 2025: Produkcja wyrobów tartacznych
-#
-# Jeżeli chcesz wyłącznie stare PKD 1610Z, ustaw:
-# SEARCH_PKD_CODES = ["1610Z"]
 SEARCH_PKD_CODES = ["1610Z", "1611Z"]
 
-# Tylko firma, której PKD główne jest w tej liście,
-# zostanie zapisana do wyniku.
 MAIN_PKD_CODES = {
     "1610Z",
     "16.10.Z",
@@ -66,31 +28,21 @@ MAIN_PKD_CODES = {
 
 STATUS = "AKTYWNY"
 
-# Dokumentacja API podaje limit 50 żądań / 3 minuty
-# i 1000 żądań / 60 minut. 3.7 s między żądaniami
-# daje bezpieczny margines względem 3.6 s.
 REQUEST_INTERVAL = 3.7
 
-# Po 403/429 odczekujemy ponad 180 s.
 RATE_LIMIT_SLEEP = 185
 
-# Maksymalna liczba firm w jednym zapytaniu szczegółowym.
 BATCH_SIZE = 25
 
-# Jak długo ponawiać błędy serwera 5xx.
 MAX_RETRIES_5XX = 5
 
 OUTPUT_CSV = "tartaki_ceidg.csv"
 STATE_FILE = "ceidg_state.json"
 
-# Ustaw True, żeby oprócz CSV zapisywać pełny JSON firmy.
 SAVE_RAW_JSON = True
 RAW_JSON_FILE = "tartaki_ceidg_raw.jsonl"
 
 
-# -------------------------
-# POMOCNICZE
-# -------------------------
 
 session = requests.Session()
 session.headers.update({
@@ -138,7 +90,6 @@ def api_get(url, params=None, timeout=30):
             time.sleep(30)
             continue
 
-        # Rate limit - w tym API może pojawić się 403.
         if response.status_code in (403, 429):
             print(
                 f"[RATE LIMIT] HTTP {response.status_code}. "
@@ -148,7 +99,6 @@ def api_get(url, params=None, timeout=30):
             time.sleep(RATE_LIMIT_SLEEP)
             continue
 
-        # Błędy serwera.
         if response.status_code >= 500:
             retries_5xx += 1
             if retries_5xx <= MAX_RETRIES_5XX:
@@ -243,7 +193,6 @@ def flatten_json(obj, prefix=""):
                 result.update(flatten_json(value, new_key))
 
             elif isinstance(value, list):
-                # Długie tablice zapisujemy jako JSON.
                 result[new_key] = json.dumps(
                     value,
                     ensure_ascii=False,
@@ -279,7 +228,6 @@ def get_detail_pkd_code(detail):
     if isinstance(pkd, dict):
         return str(pkd.get("kod", "")).strip().upper()
 
-    # Awaryjnie, gdy API zwróci już spłaszczone pole.
     flat_code = detail.get("pkdGlowny.kod")
     if flat_code:
         return str(flat_code).strip().upper()
@@ -303,7 +251,6 @@ def build_output_record(summary, detail):
 
     pkd_code = get_detail_pkd_code(detail)
 
-    # Najważniejsze standardowe pola - jeśli istnieją.
     merged["CEIDG_ID"] = detail.get("id") or summary.get("id") or ""
     merged["PKD_GLOWNE_KOD"] = pkd_code
 
@@ -313,7 +260,6 @@ def build_output_record(summary, detail):
     else:
         merged["PKD_GLOWNE_NAZWA"] = ""
 
-    # Typowe dane identyfikacyjne.
     merged["NIP"] = first_value(
         detail,
         ["nip", "NIP"],
@@ -331,7 +277,6 @@ def build_output_record(summary, detail):
         ["status"],
     )
 
-    # Typowe dane kontaktowe.
     merged["EMAIL"] = first_value(
         detail,
         ["email", "adresEmail", "emailFirmowy"],
@@ -369,7 +314,6 @@ def get_company_details(ids, state):
     """
     results = []
     
-    # Dzielimy IDs na paczki po maksymalnie 5 sztuk
     for i in range(0, len(ids), 5):
         chunk = ids[i:i+5]
         params = [("ids", firm_id) for firm_id in chunk]
@@ -418,7 +362,6 @@ def append_records_to_csv(records):
 
     new_df = pd.DataFrame(records)
 
-    # Stabilne, czytelne sortowanie kolumn:
     preferred = [
         "CEIDG_ID",
         "NAZWA",
@@ -436,7 +379,6 @@ def append_records_to_csv(records):
         for row in records:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    # Regenerate CSV perfectly aligned
     combined_df = pd.read_json("tartaki_ceidg.jsonl", lines=True, dtype=str)
 
     remaining = [
@@ -494,9 +436,6 @@ def load_processed_ids_from_csv():
         return set()
 
 
-# -------------------------
-# GŁÓWNY PROGRAM
-# -------------------------
 
 def main():
     ensure_token()
@@ -513,7 +452,6 @@ def main():
 
     state = load_state()
 
-    # IDs już zapisane do CSV + IDs zapisane w state.
     processed_ids = set(
         str(x)
         for x in state.get("processed_ids", [])
@@ -570,7 +508,6 @@ def main():
                     flush=True,
                 )
 
-                # Usuwamy ID już wcześniej przetworzone.
                 candidate_summaries = []
                 batch_ids = []
 
@@ -615,7 +552,6 @@ def main():
                     detail_data
                 )
 
-                # Mapowanie szczegółów po ID.
                 details_by_id = {}
 
                 for detail in details:
@@ -624,9 +560,6 @@ def main():
                     if detail_id:
                         details_by_id[str(detail_id)] = detail
 
-                # Jeżeli API nie zwróciło któregoś ID, próbujemy
-                # ponownie tylko dla brakujących. Dzięki temu nie
-                # przesuniemy strony i nie zgubimy żadnej firmy.
                 missing_ids = [
                     firm_id
                     for firm_id in batch_ids
@@ -660,10 +593,6 @@ def main():
                         if firm_id not in details_by_id
                     ]
 
-                # Jeżeli po drugim żądaniu nadal brakuje danych,
-                # zatrzymujemy program. Strona NIE zostanie oznaczona
-                # jako ukończona, więc po ponownym uruchomieniu zostanie
-                # pobrana ponownie.
                 if missing_ids:
                     raise RuntimeError(
                         "API nie zwróciło szczegółów dla następujących ID "
@@ -686,7 +615,6 @@ def main():
                         detail
                     )
 
-                    # Weryfikujemy PKD główne.
                     if main_pkd in MAIN_PKD_CODES:
 
                         record = build_output_record(
@@ -706,11 +634,8 @@ def main():
                     else:
                         rejected_count += 1
 
-                    # Firmę uznajemy za przetworzoną dopiero po
-                    # otrzymaniu pełnej odpowiedzi szczegółowej.
                     processed_ids.add(firm_id)
 
-                # Zapis wyników.
                 append_records_to_csv(
                     accepted_records
                 )
@@ -719,12 +644,10 @@ def main():
                     raw_records
                 )
 
-                # Aktualizujemy state.
                 state["processed_ids"] = list(
                     processed_ids
                 )
 
-                # Dopiero po udanym batchu przesuwamy stronę.
                 page += 1
                 state["completed_pages"][page_key] = page
 
@@ -740,8 +663,6 @@ def main():
                     flush=True,
                 )
 
-                # Jeżeli API zwróci mniej niż limit, zwykle oznacza
-                # to ostatnią stronę.
                 if len(summaries) < BATCH_SIZE:
                     print(
                         f"[{pkd_code}] Otrzymano mniej niż "
