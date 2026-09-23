@@ -17,6 +17,7 @@ const kodFilter = document.getElementById('kodFilter');
 const searchFilter = document.getElementById('searchFilter');
 const contactedFilter = document.getElementById('contactedFilter');
 const pkdFilter = document.getElementById('pkdFilter');
+const rejestrFilter = document.getElementById('rejestrFilter');
 const hideNanRegion = document.getElementById('hideNanRegion');
 const resetFilters = document.getElementById('resetFilters');
 const tableBody = document.getElementById('tableBody');
@@ -46,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hideNanRegion.addEventListener('change', applyFilters);
     contactedFilter.addEventListener('change', applyFilters);
     pkdFilter.addEventListener('change', applyFilters);
+    rejestrFilter.addEventListener('change', applyFilters);
     miastoFilter.addEventListener('input', applyFilters);
     kodFilter.addEventListener('input', applyFilters);
     searchFilter.addEventListener('input', applyFilters);
@@ -57,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
         searchFilter.value = '';
         contactedFilter.value = 'ALL';
         pkdFilter.value = '';
+        rejestrFilter.value = 'ALL';
         hideNanRegion.checked = true;
         applyFilters();
     });
@@ -105,28 +108,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Load CSV Data
 function loadData() {
-    Papa.parse('tartaki_ceidg.csv', {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: function(results) {
-            allData = results.data;
-            filteredData = [...allData];
-            
-            // Populate Filters
-            populateFilters();
-            
-            // Render
-            applyFilters();
+    Promise.all([
+        fetch('tartaki_ceidg.csv').then(res => res.ok ? res.text() : null).catch(() => null),
+        fetch('tartaki_krs.csv').then(res => res.ok ? res.text() : null).catch(() => null)
+    ]).then(([ceidgText, krsText]) => {
+        let tempData = [];
+        
+        if (ceidgText) {
+            const parsed = Papa.parse(ceidgText, { header: true, skipEmptyLines: true });
+            parsed.data.forEach(row => { if(!row.REJESTR) row.REJESTR = "CEIDG"; });
+            tempData = tempData.concat(parsed.data);
+        }
+        
+        if (krsText) {
+            const parsed = Papa.parse(krsText, { header: true, skipEmptyLines: true });
+            parsed.data.forEach(row => { if(!row.REJESTR) row.REJESTR = "KRS"; });
+            tempData = tempData.concat(parsed.data);
+        }
+        
+        allData = tempData;
+        filteredData = [...allData];
+        
+        populateFilters();
+        applyFilters();
+        
+        if(allData.length > 0) {
             recordCountLabel.textContent = "Dane załadowane. Połączono.";
             document.querySelector('.dot').classList.remove('pulse');
-        },
-        error: function(err) {
-            console.error(err);
-            recordCountLabel.textContent = "Błąd ładowania danych.";
+        } else {
+            recordCountLabel.textContent = "Brak danych (CSV).";
             recordCountLabel.style.color = "var(--danger)";
-            document.querySelector('.dot').style.backgroundColor = "var(--danger)";
         }
+    }).catch(err => {
+        console.error(err);
+        recordCountLabel.textContent = "Błąd ładowania danych.";
+        recordCountLabel.style.color = "var(--danger)";
+        document.querySelector('.dot').style.backgroundColor = "var(--danger)";
     });
 }
 
@@ -165,6 +182,7 @@ function applyFilters() {
     const kFilter = kodFilter.value.toLowerCase();
     const term = searchFilter.value.toLowerCase();
     const cFilter = contactedFilter.value;
+    const rFilter = rejestrFilter.value;
     const pkdVal = pkdFilter.value.toLowerCase();
     const hideNan = hideNanRegion.checked;
     
@@ -177,6 +195,7 @@ function applyFilters() {
         const nip = (row['NIP'] || '').toLowerCase();
         const ceidgId = row['CEIDG_ID'] || row['id'] || nip;
         const rowPkd = (row['PKD_GLOWNE_KOD'] || '').toLowerCase();
+        const rejestr = (row['REJESTR'] || 'CEIDG').toUpperCase();
         
         const matchWoj = !wFilter || woj === wFilter;
         const matchStat = sFilter === 'all' || !sFilter || stat === sFilter;
@@ -186,10 +205,12 @@ function applyFilters() {
         const matchNan = !hideNan || (woj !== 'nan' && woj !== '');
         const matchPkd = !pkdVal || rowPkd === pkdVal;
         
+        const matchRejestr = rFilter === 'ALL' || rejestr === rFilter;
+        
         const isContacted = !!contactedFirms[ceidgId];
         const matchContacted = cFilter === 'ALL' || (cFilter === 'YES' && isContacted) || (cFilter === 'NO' && !isContacted);
         
-        return matchWoj && matchStat && matchMiasto && matchKod && matchSearch && matchNan && matchContacted && matchPkd;
+        return matchWoj && matchStat && matchMiasto && matchKod && matchSearch && matchNan && matchContacted && matchPkd && matchRejestr;
     });
     
     currentPage = 1;
@@ -265,6 +286,8 @@ function renderTable() {
         
         const ceidgId = row['CEIDG_ID'] || row['id'] || nip;
         const isContacted = !!contactedFirms[ceidgId];
+        const rejestr = (row['REJESTR'] || 'CEIDG').toUpperCase();
+        const rejestrStyle = rejestr === 'KRS' ? 'background: rgba(168,85,247,0.2); color: #d8b4fe; border: 1px solid rgba(168,85,247,0.3);' : 'background: rgba(59,130,246,0.2); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3);';
         
         tr.innerHTML = `
             <td style="text-align: center;"><input type="checkbox" class="contact-checkbox" data-id="${ceidgId}" ${isContacted ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;"></td>
@@ -272,6 +295,7 @@ function renderTable() {
             <td>${nip}</td>
             <td>${regon}</td>
             <td>${pkd}</td>
+            <td><span class="badge" style="${rejestrStyle}">${rejestr}</span></td>
             <td>${woj}</td>
             <td>${powiat}</td>
             <td>${gmina}</td>

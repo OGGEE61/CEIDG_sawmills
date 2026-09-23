@@ -450,6 +450,8 @@ def load_processed_ids_from_csv():
 
 
 def main():
+    import sys
+    update_mode = "--update" in sys.argv
     ensure_token()
 
     print("=" * 70)
@@ -463,6 +465,11 @@ def main():
     print("=" * 70)
 
     state = load_state()
+    
+    if update_mode:
+        print("\n[UPDATE MODE] Wykryto flagę --update. Zresetowano licznik stron.")
+        print("Skrypt przeszuka wszystkie strony ponownie, pobierając tylko nowe, brakujące ID.\n")
+        state["completed_pages"] = {}
 
     processed_ids = set(
         str(x)

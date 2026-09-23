@@ -33,6 +33,25 @@ This project provides tools to fetch, process, and visualize data about active s
    ```
    Then navigate to `http://localhost:8000/index.html`.
 
+5. **Updating the database**: To scan for newly registered companies, use the `--update` flag:
+   ```bash
+   python fetch_data.py --update
+   ```
+   This will quickly scan all API pages and only fetch detailed data for new companies that aren't already in your database.
+
+## Rozszerzenie bazy o Spółki z KRS (Opcjonalne)
+
+Domyślnie skrypt `fetch_data.py` pobiera tylko jednoosobowe działalności z CEIDG. Aby dodać do bazy spółki (np. Sp. z o.o., Sp. k., S.A.), skorzystaj z darmowego pliku Otwartych Danych.
+
+1. Pobierz plik CSV z wykazem podmiotów KRS ze strony [dane.gov.pl - Wykaz podmiotów zarejestrowanych w KRS](https://dane.gov.pl/pl/dataset/193,wykaz-podmiotow-zarejestrowanych-w-krs).
+2. Zapisz rozpakowany plik na swoim komputerze (plik może zajmować kilka GB).
+3. Uruchom skrypt przetwarzający, podając ścieżkę do pobranego pliku:
+   ```bash
+   python process_krs_dump.py /sciezka/do/pobranego_pliku.csv --sep ";"
+   ```
+4. Skrypt wyodrębni spółki tartaczne i zapisze je do pliku `tartaki_krs.csv`.
+5. Odśwież Dashboard w przeglądarce. Aplikacja automatycznie załaduje i połączy dane z obu plików (CEIDG i KRS).
+
 ## Technical Details
 
 **CEIDG API v3 Data Sourcing:**
