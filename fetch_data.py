@@ -122,6 +122,18 @@ def api_get(url, params=None, timeout=30):
         try:
             return response.json()
         except ValueError as exc:
+            if "Przerwa" in response.text or "<html" in response.text.lower():
+                print("[MAINTENANCE] Przerwa serwisowa API lub błąd HTML. Czekam 300 s...", flush=True)
+                time.sleep(300)
+                continue
+                
+            retries_5xx += 1
+            if retries_5xx <= MAX_RETRIES_5XX:
+                wait = min(60, 10 * retries_5xx)
+                print(f"[JSON ERROR] Niepoprawny JSON. Próba {retries_5xx}/{MAX_RETRIES_5XX} za {wait} s...", flush=True)
+                time.sleep(wait)
+                continue
+                
             raise RuntimeError(
                 f"API zwróciło niepoprawny JSON dla {url}: "
                 f"{response.text[:1000]}"
