@@ -16,6 +16,7 @@ const miastoFilter = document.getElementById('miastoFilter');
 const kodFilter = document.getElementById('kodFilter');
 const searchFilter = document.getElementById('searchFilter');
 const contactedFilter = document.getElementById('contactedFilter');
+const pkdFilter = document.getElementById('pkdFilter');
 const hideNanRegion = document.getElementById('hideNanRegion');
 const resetFilters = document.getElementById('resetFilters');
 const tableBody = document.getElementById('tableBody');
@@ -25,6 +26,10 @@ const totalFirmsLabel = document.getElementById('totalFirms');
 const topRegionLabel = document.getElementById('topRegion');
 const prevPageBtn = document.getElementById('prevPage');
 const nextPageBtn = document.getElementById('nextPage');
+const firstPageBtn = document.getElementById('firstPage');
+const lastPageBtn = document.getElementById('lastPage');
+const pageInput = document.getElementById('pageInput');
+const maxPageLabel = document.getElementById('maxPageLabel');
 const pageInfoLabel = document.getElementById('pageInfo');
 
 // Setup Chart Defaults for Dark Theme
@@ -40,6 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     statusFilter.addEventListener('change', applyFilters);
     hideNanRegion.addEventListener('change', applyFilters);
     contactedFilter.addEventListener('change', applyFilters);
+    pkdFilter.addEventListener('change', applyFilters);
     miastoFilter.addEventListener('input', applyFilters);
     kodFilter.addEventListener('input', applyFilters);
     searchFilter.addEventListener('input', applyFilters);
@@ -50,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
         kodFilter.value = '';
         searchFilter.value = '';
         contactedFilter.value = 'ALL';
+        pkdFilter.value = '';
         hideNanRegion.checked = true;
         applyFilters();
     });
@@ -73,6 +80,26 @@ document.addEventListener('DOMContentLoaded', () => {
             currentPage++;
             renderTable();
         }
+    });
+
+    firstPageBtn.addEventListener('click', () => {
+        currentPage = 1;
+        renderTable();
+    });
+
+    lastPageBtn.addEventListener('click', () => {
+        const maxPage = Math.ceil(filteredData.length / rowsPerPage) || 1;
+        currentPage = maxPage;
+        renderTable();
+    });
+
+    pageInput.addEventListener('change', (e) => {
+        let page = parseInt(e.target.value);
+        const maxPage = Math.ceil(filteredData.length / rowsPerPage) || 1;
+        if(isNaN(page) || page < 1) page = 1;
+        if(page > maxPage) page = maxPage;
+        currentPage = page;
+        renderTable();
     });
 });
 
@@ -106,10 +133,12 @@ function loadData() {
 function populateFilters() {
     const wojewodztwa = new Set();
     const statusy = new Set();
+    const pkds = new Set();
     
     allData.forEach(row => {
         if(row['detail.adresDzialalnosci.wojewodztwo']) wojewodztwa.add(row['detail.adresDzialalnosci.wojewodztwo'].toUpperCase());
         if(row['STATUS']) statusy.add(row['STATUS'].toUpperCase());
+        if(row['PKD_GLOWNE_KOD']) pkds.add(row['PKD_GLOWNE_KOD'].toUpperCase());
     });
     
     Array.from(wojewodztwa).sort().forEach(w => {
@@ -117,6 +146,13 @@ function populateFilters() {
         opt.value = w;
         opt.textContent = w;
         wojewodztwoFilter.appendChild(opt);
+    });
+
+    Array.from(pkds).sort().forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        pkdFilter.appendChild(opt);
     });
     
     // Statuses are hardcoded in HTML, so we don't need to auto-populate them.
@@ -129,6 +165,7 @@ function applyFilters() {
     const kFilter = kodFilter.value.toLowerCase();
     const term = searchFilter.value.toLowerCase();
     const cFilter = contactedFilter.value;
+    const pkdVal = pkdFilter.value.toLowerCase();
     const hideNan = hideNanRegion.checked;
     
     filteredData = allData.filter(row => {
@@ -139,6 +176,7 @@ function applyFilters() {
         const nazwa = (row['NAZWA'] || '').toLowerCase();
         const nip = (row['NIP'] || '').toLowerCase();
         const ceidgId = row['CEIDG_ID'] || row['id'] || nip;
+        const rowPkd = (row['PKD_GLOWNE_KOD'] || '').toLowerCase();
         
         const matchWoj = !wFilter || woj === wFilter;
         const matchStat = sFilter === 'all' || !sFilter || stat === sFilter;
@@ -146,11 +184,12 @@ function applyFilters() {
         const matchKod = !kFilter || kod.includes(kFilter);
         const matchSearch = !term || nazwa.includes(term) || nip.includes(term);
         const matchNan = !hideNan || (woj !== 'nan' && woj !== '');
+        const matchPkd = !pkdVal || rowPkd === pkdVal;
         
         const isContacted = !!contactedFirms[ceidgId];
         const matchContacted = cFilter === 'ALL' || (cFilter === 'YES' && isContacted) || (cFilter === 'NO' && !isContacted);
         
-        return matchWoj && matchStat && matchMiasto && matchKod && matchSearch && matchNan && matchContacted;
+        return matchWoj && matchStat && matchMiasto && matchKod && matchSearch && matchNan && matchContacted && matchPkd;
     });
     
     currentPage = 1;
@@ -249,10 +288,14 @@ function renderTable() {
     
     // Update pagination controls
     const maxPage = Math.ceil(filteredData.length / rowsPerPage) || 1;
-    pageInfoLabel.textContent = `Strona ${currentPage} z ${maxPage}`;
     
+    pageInput.value = currentPage;
+    maxPageLabel.textContent = maxPage;
+    
+    firstPageBtn.disabled = currentPage === 1;
     prevPageBtn.disabled = currentPage === 1;
     nextPageBtn.disabled = currentPage === maxPage;
+    lastPageBtn.disabled = currentPage === maxPage;
 
     // Add event listeners to checkboxes
     document.querySelectorAll('.contact-checkbox').forEach(cb => {
