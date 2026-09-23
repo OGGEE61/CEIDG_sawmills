@@ -1,0 +1,14 @@
+venv/
+.env
+__pycache__/
+*.pyc
+.DS_Store
+
+# Data files
+*.csv
+*.jsonl
+ceidg_state.json
+
+# IDE
+.vscode/
+.idea/
