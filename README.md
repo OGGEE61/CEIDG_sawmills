@@ -4,12 +4,12 @@ This project provides tools to fetch, process, and visualize data about active s
 
 ## Features
 
-* **Data Sourcing (`v2_batched/fetch_data_v2.py`)**: A Python script that queries the CEIDG API for businesses registered under specific PKD codes (1610Z, 1611Z). It features:
+* **Data Sourcing (`fetch_data.py`)**: A Python script that queries the CEIDG API for businesses registered under specific PKD codes (1610Z, 1611Z). It features:
   * Batch processing of detailed company information.
   * Resumable state management (saves progress to avoid restarting from scratch).
   * Rate limit handling and automatic retries.
   * Output generation in both flattened CSV format and raw JSONL format.
-* **Dashboard (`v2_batched/index_v2.html`)**: A web interface for visualizing the fetched data.
+* **Dashboard (`index.html`)**: A web interface for visualizing the fetched data.
 * **Local Web Server (`serve.py`)**: A simple Python HTTP server to serve the dashboard and prevent caching issues during development.
 
 ## Setup
@@ -25,10 +25,10 @@ This project provides tools to fetch, process, and visualize data about active s
    ```
 3. Run the data fetcher:
    ```bash
-   python v2_batched/fetch_data_v2.py
+   python fetch_data.py
    ```
 4. Start the local server to view the dashboard:
    ```bash
    python serve.py
    ```
-   Then navigate to `http://localhost:8000/v2_batched/index_v2.html`.
+   Then navigate to `http://localhost:8000/index.html`.
