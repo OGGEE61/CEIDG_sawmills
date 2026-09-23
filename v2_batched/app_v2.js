@@ -1,7 +1,9 @@
 let allData = [];
 let filteredData = [];
 let currentPage = 1;
-let rowsPerPage = 15;
+let rowsPerPage = 50;
+
+let contactedFirms = JSON.parse(localStorage.getItem('contactedFirms')) || {};
 
 // Chart instances
 let regionChartInst = null;
@@ -13,6 +15,7 @@ const statusFilter = document.getElementById('statusFilter');
 const miastoFilter = document.getElementById('miastoFilter');
 const kodFilter = document.getElementById('kodFilter');
 const searchFilter = document.getElementById('searchFilter');
+const contactedFilter = document.getElementById('contactedFilter');
 const hideNanRegion = document.getElementById('hideNanRegion');
 const resetFilters = document.getElementById('resetFilters');
 const tableBody = document.getElementById('tableBody');
@@ -36,16 +39,18 @@ document.addEventListener('DOMContentLoaded', () => {
     wojewodztwoFilter.addEventListener('change', applyFilters);
     statusFilter.addEventListener('change', applyFilters);
     hideNanRegion.addEventListener('change', applyFilters);
+    contactedFilter.addEventListener('change', applyFilters);
     miastoFilter.addEventListener('input', applyFilters);
     kodFilter.addEventListener('input', applyFilters);
     searchFilter.addEventListener('input', applyFilters);
     resetFilters.addEventListener('click', () => {
         wojewodztwoFilter.value = '';
-        statusFilter.value = '';
+        statusFilter.value = 'ALL';
         miastoFilter.value = '';
         kodFilter.value = '';
         searchFilter.value = '';
-        hideNanRegion.checked = false;
+        contactedFilter.value = 'ALL';
+        hideNanRegion.checked = true;
         applyFilters();
     });
     
@@ -123,6 +128,7 @@ function applyFilters() {
     const mFilter = miastoFilter.value.toLowerCase();
     const kFilter = kodFilter.value.toLowerCase();
     const term = searchFilter.value.toLowerCase();
+    const cFilter = contactedFilter.value;
     const hideNan = hideNanRegion.checked;
     
     filteredData = allData.filter(row => {
@@ -132,6 +138,7 @@ function applyFilters() {
         const kod = (row['detail.adresDzialalnosci.kod'] || '').toLowerCase();
         const nazwa = (row['NAZWA'] || '').toLowerCase();
         const nip = (row['NIP'] || '').toLowerCase();
+        const ceidgId = row['CEIDG_ID'] || row['id'] || nip;
         
         const matchWoj = !wFilter || woj === wFilter;
         const matchStat = sFilter === 'all' || !sFilter || stat === sFilter;
@@ -140,7 +147,10 @@ function applyFilters() {
         const matchSearch = !term || nazwa.includes(term) || nip.includes(term);
         const matchNan = !hideNan || (woj !== 'nan' && woj !== '');
         
-        return matchWoj && matchStat && matchMiasto && matchKod && matchSearch && matchNan;
+        const isContacted = !!contactedFirms[ceidgId];
+        const matchContacted = cFilter === 'ALL' || (cFilter === 'YES' && isContacted) || (cFilter === 'NO' && !isContacted);
+        
+        return matchWoj && matchStat && matchMiasto && matchKod && matchSearch && matchNan && matchContacted;
     });
     
     currentPage = 1;
@@ -214,7 +224,11 @@ function renderTable() {
             fullAdres += `<br><span style="font-size: 0.85em; color: var(--text-muted);">${ulicaPart.trim()}</span>`;
         }
         
+        const ceidgId = row['CEIDG_ID'] || row['id'] || nip;
+        const isContacted = !!contactedFirms[ceidgId];
+        
         tr.innerHTML = `
+            <td style="text-align: center;"><input type="checkbox" class="contact-checkbox" data-id="${ceidgId}" ${isContacted ? 'checked' : ''} style="width: 18px; height: 18px; cursor: pointer;"></td>
             <td class="col-nazwa"><strong>${nazwa}</strong></td>
             <td>${nip}</td>
             <td>${regon}</td>
@@ -239,6 +253,19 @@ function renderTable() {
     
     prevPageBtn.disabled = currentPage === 1;
     nextPageBtn.disabled = currentPage === maxPage;
+
+    // Add event listeners to checkboxes
+    document.querySelectorAll('.contact-checkbox').forEach(cb => {
+        cb.addEventListener('change', (e) => {
+            const id = e.target.getAttribute('data-id');
+            if (e.target.checked) {
+                contactedFirms[id] = true;
+            } else {
+                delete contactedFirms[id];
+            }
+            localStorage.setItem('contactedFirms', JSON.stringify(contactedFirms));
+        });
+    });
 }
 
 function renderCharts() {
