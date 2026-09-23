@@ -289,8 +289,8 @@ function renderCharts() {
     // Sort regions by count
     const sortedRegions = Object.entries(regionCounts).sort((a,b) => b[1] - a[1]).slice(0, 10); // Top 10
     
-    // Sort years by year desc, take top 5
-    const sortedYears = Object.keys(yearCounts).sort().reverse().slice(0, 6).reverse(); // Last 6 years
+    // Sort years chronologically
+    const sortedYears = Object.keys(yearCounts).sort(); // All years
     const yearData = sortedYears.map(y => yearCounts[y]);
 
     // Draw Region Chart
