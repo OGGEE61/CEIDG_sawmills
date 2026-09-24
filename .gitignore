@@ -11,6 +11,11 @@ __pycache__/
 raw_krs/
 ceidg_state.json
 
+# Keep dashboard datasets in Git
+!data/
+!data/processed/
+!data/processed/*.csv
+
 # IDE
 .vscode/
 .idea/
