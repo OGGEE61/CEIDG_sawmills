@@ -19,7 +19,7 @@ def main():
     
     target_pkds = ["16.10.Z", "16.11.Z", "16.12.Z"]
     per_page = 100
-    output_file = "all_candidates.csv"
+    output_file = "../../data/processed/all_candidates.csv"
     
     file_exists = os.path.isfile(output_file)
     

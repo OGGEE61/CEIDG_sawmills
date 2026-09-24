@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🪵 Tartaki (16.10.Z) - CEIDG i KRS Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🪵</text></svg>'>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Top Header -->
+        <header class="top-header">
+            <div class="logo" style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 32px;">🪵</span>
+                <div>
+                    <h2 style="margin: 0;">Firmy<span class="highlight">16.10.Z</span></h2>
+                    <p style="margin: 0;">Dane CEIDG i KRS</p>
+                </div>
+            </div>
+            
+            <div class="tabs-container">
+                <button class="tab-btn active" data-rejestr="ALL">Wszystkie Rejestry</button>
+                <button class="tab-btn" data-rejestr="CEIDG">CEIDG (Osoby fiz.)</button>
+                <button class="tab-btn" data-rejestr="KRS">KRS (Spółki)</button>
+            </div>
+
+            <div class="status-indicator">
+                <span class="dot pulse"></span> <span id="recordCount">Ładowanie danych...</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header Cards -->
+            <div class="cards-grid">
+                <div class="card stat-card">
+                    <div class="stat-title">Liczba firm</div>
+                    <div class="stat-value" id="totalFirms">0</div>
+                </div>
+                <div class="card stat-card">
+                    <div class="stat-title">Najwięcej PKD 16.10.Z</div>
+                    <div class="stat-value" id="topRegion">-</div>
+                </div>
+            </div>
+
+            <!-- Charts and Map -->
+            <div class="charts-grid">
+                <div class="card map-card">
+                    <h3>Mapa zagęszczenia (Kliknij, by filtrować)</h3>
+                    <div id="map-container" class="map-container">
+                    </div>
+                </div>
+                <div class="card chart-card">
+                    <h3>Firmy wg Województw</h3>
+                    <div class="chart-container">
+                        <canvas id="regionChart"></canvas>
+                    </div>
+                </div>
+                <div class="card chart-card">
+                    <h3>Nowe firmy wg lat (Kliknij słupek, by filtrować)</h3>
+                    <div class="chart-container">
+                        <canvas id="yearChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Horizontal Filters -->
+            <div class="card filters-card">
+                <div class="filters-header">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 18px;">🔍</span>
+                        <h3 style="margin: 0; font-size: 16px; font-weight: 600;">Filtry i wyszukiwanie</h3>
+                    </div>
+                    <div class="filters-header-actions">
+                        <button id="resetFilters" class="btn btn-secondary btn-sm">↺ Wyczyść filtry</button>
+                    </div>
+                </div>
+
+                <div class="filters-grid">
+                    <div class="filter-group search-group">
+                        <label for="searchFilter">Wyszukaj</label>
+                        <input type="text" id="searchFilter" placeholder="Nazwa firmy, NIP...">
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="wojewodztwoFilter">Województwo</label>
+                        <select id="wojewodztwoFilter">
+                            <option value="">Wszystkie</option>
+                        </select>
+                        <label class="checkbox-label" style="margin-top: 6px; font-size: 11px;">
+                            <input type="checkbox" id="hideNanRegion" checked>
+                            <span>Ukryj brakujące woj.</span>
+                        </label>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="statusFilter">Status</label>
+                        <select id="statusFilter">
+                            <option value="ALL">Wszystkie statusy</option>
+                            <option value="AKTYWNY">Aktywne</option>
+                            <option value="W LIKWIDACJI">W likwidacji</option>
+                            <option value="ZAWIESZONY">Zawieszone</option>
+                            <option value="WYKREŚLONY">Wykreślone</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="pkdFilter">PKD Główne</label>
+                        <select id="pkdFilter">
+                            <option value="">Wszystkie</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="contactedFilter">Kontakt</label>
+                        <select id="contactedFilter">
+                            <option value="ALL">Wszystkie</option>
+                            <option value="YES">Skontaktowane</option>
+                            <option value="NO">Nie skontaktowane</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="miastoFilter">Miasto</label>
+                        <input type="text" id="miastoFilter" placeholder="Wpisz miasto...">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="kodFilter">Kod pocztowy</label>
+                        <input type="text" id="kodFilter" placeholder="np. 00-001">
+                    </div>
+                </div>
+                
+                <div class="filters-footer">
+                    <div id="yearFilterContainer" style="display: none; align-items: center; gap: 8px;">
+                        <span style="font-size: 13px; color: var(--text-muted);">Aktywny filtr roku:</span>
+                        <span id="selectedYearTag" class="badge" style="background: rgba(180, 83, 9, 0.15); color: #92400e; border: 1px solid rgba(180, 83, 9, 0.3); font-size: 13px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 6px;">
+                            <span id="selectedYearText">2020</span>
+                            <button id="clearYearFilter" style="background: none; border: none; color: inherit; cursor: pointer; font-size: 14px; font-weight: bold; line-height: 1; padding: 0;" title="Usuń filtr roku">✕</button>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Table -->
+            <div class="card table-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <h3 style="margin-bottom: 2px;">Lista firm</h3>
+                        <p style="font-size: 13px; color: var(--text-muted);">💡 Kliknij wiersz firmy, aby wyświetlić pełną kartę ze wszystkimi danymi (kapitał, PKD, adres).</p>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th style="text-align: center; width: 60px;">Kontakt</th>
+                                <th>Nazwa</th>
+                                <th>NIP</th>
+                                <th>Regon</th>
+                                <th>PKD Główne</th>
+                                <th>Rejestr</th>
+                                <th>Województwo</th>
+                                <th>Adres (Miasto, Ulica)</th>
+                                <th>Kod Poczt.</th>
+                                <th>Email</th>
+                                <th>Telefon</th>
+                                <th>WWW</th>
+                                <th>Status</th>
+                                <th>Data Rozp.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- Rows generated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <div style="display:flex; align-items:center; gap: 10px; margin-right: auto; color: var(--text-muted); font-size: 14px;">
+                        Wyników na stronę: 
+                        <select id="rowsPerPageSelect" style="background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px;">
+                            <option value="15">15</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+                    <button id="firstPage" class="btn btn-icon" disabled>&laquo;</button>
+                    <button id="prevPage" class="btn btn-icon" disabled>&larr;</button>
+                    <span id="pageInfo">
+                        Strona <input type="number" id="pageInput" min="1" value="1" style="width: 60px; background: var(--card-bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; text-align: center;"> z <span id="maxPageLabel">1</span>
+                    </span>
+                    <button id="nextPage" class="btn btn-icon" disabled>&rarr;</button>
+                    <button id="lastPage" class="btn btn-icon" disabled>&raquo;</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Company Details Modal -->
+    <div id="companyModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title-area">
+                    <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 6px;">
+                        <span id="modalRejestrBadge" class="badge">KRS</span>
+                        <span id="modalStatusBadge" class="badge">AKTYWNY</span>
+                    </div>
+                    <h2 id="modalFirmName">Nazwa firmy</h2>
+                </div>
+                <button id="modalCloseBtn" class="modal-close-btn" title="Zamknij (Esc)">✕</button>
+            </div>
+            <div id="modalBody" class="modal-body">
+                <!-- Dynamically generated sections -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

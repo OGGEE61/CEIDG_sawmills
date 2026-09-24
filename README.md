@@ -1,66 +1,65 @@
-# CEIDG Sawmills Data Sourcing & Dashboard
+# CEIDG & KRS Sawmills Data Sourcing & Dashboard
 
-This project provides tools to fetch, process, and visualize data about active sawmills (tartaki) from the Polish CEIDG (Centralna Ewidencja i Informacja o Działalności Gospodarczej) API v3. 
+This project provides tools to fetch, process, and visualize data about active sawmills (tartaki) from both the Polish CEIDG (Osoby fizyczne) API v3 and the official KRS (Spółki) via custom scraper.
 
 ## Features
 
-* **Data Sourcing (`fetch_data.py`)**: A Python script that queries the CEIDG API for businesses registered under specific PKD codes (1610Z, 1611Z). It features:
-  * Batch processing of detailed company information.
-  * Resumable state management (saves progress to avoid restarting from scratch).
-  * Rate limit handling and automatic retries.
-  * Output generation in both flattened CSV format and raw JSONL format.
-* **Dashboard (`index.html`)**: A web interface for visualizing the fetched data.
-* **Local Web Server (`serve.py`)**: A simple Python HTTP server to serve the dashboard and prevent caching issues during development.
+* **Data Sourcing CEIDG (`src/ceidg_scraper/fetch_data.py`)**: Queries the CEIDG API for businesses registered under target PKD codes.
+* **Data Sourcing KRS (`src/krs_scraper/proxy_discover_all.py` & `krs_tartaki.py`)**: Uses proxies to find target companies and verifies them against the official KRS MS API.
+* **Dashboard (`src/dashboard/index.html`)**: A web interface for visualizing both datasets, featuring a dynamic heat map of Poland.
+* **Local Web Server (`run_dashboard.py`)**: A simple Python server to launch the dashboard.
 
-## Setup
+## Directory Structure
+```text
+/Users/gustaw/Documents/Projects/dane_gov
+├── data/                    # Heavy datasets and raw files
+│   ├── raw/                 # Raw JSONL dumps from CEIDG, raw KRS JSONs
+│   └── processed/           # Final CSVs ready for the dashboard (tartaki_ceidg.csv, tartaki_full.csv)
+├── src/                     # Source Code
+│   ├── dashboard/           # HTML/CSS/JS for the frontend
+│   ├── ceidg_scraper/       # CEIDG Python scripts
+│   └── krs_scraper/         # KRS Python scripts
+├── venv/                    # Python virtual environment
+├── run_dashboard.py         # Script to run the dashboard
+└── requirements.txt         # Dependencies
+```
 
-1. Install dependencies:
+## Setup & Running
+
+**It is highly recommended to run all Python scripts from your virtual environment.**
+
+1. **Activate your virtual environment (if not already active):**
+   ```bash
+   source venv/bin/activate
+   ```
+   *(Or just use `venv/bin/python` directly in your commands)*
+
+2. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
-   *(Requires `requests` and `pandas`)*
-2. Set your CEIDG API token as an environment variable:
+
+3. **View the Dashboard:**
+   To launch the dashboard server, run:
    ```bash
-   export CEIDG_TOKEN="YOUR_TOKEN"
+   venv/bin/python run_dashboard.py
    ```
-3. Run the data fetcher:
-   ```bash
-   python fetch_data.py
-   ```
-4. Start the local server to view the dashboard:
-   ```bash
-   python serve.py
-   ```
-   Then navigate to `http://localhost:8000/index.html`.
+   Then navigate to: [http://localhost:8000/src/dashboard/index.html](http://localhost:8000/src/dashboard/index.html)
 
-5. **Updating the database**: To scan for newly registered companies, use the `--update` flag:
-   ```bash
-   python fetch_data.py --update
-   ```
-   This will quickly scan all API pages and only fetch detailed data for new companies that aren't already in your database.
+## Fetching New Data
 
-## Rozszerzenie bazy o Spółki z KRS (Opcjonalne)
+### CEIDG (Osoby Fizyczne)
+```bash
+export CEIDG_TOKEN="YOUR_TOKEN"
+cd src/ceidg_scraper
+../../venv/bin/python fetch_data.py
+```
+*To update with newly registered companies, add the `--update` flag.*
 
-Domyślnie skrypt `fetch_data.py` pobiera tylko jednoosobowe działalności z CEIDG. Aby dodać do bazy spółki (np. Sp. z o.o., Sp. k., S.A.), skorzystaj z darmowego pliku Otwartych Danych.
-
-1. Pobierz plik CSV z wykazem podmiotów KRS ze strony [dane.gov.pl - Wykaz podmiotów zarejestrowanych w KRS](https://dane.gov.pl/pl/dataset/193,wykaz-podmiotow-zarejestrowanych-w-krs).
-2. Zapisz rozpakowany plik na swoim komputerze (plik może zajmować kilka GB).
-3. Uruchom skrypt przetwarzający, podając ścieżkę do pobranego pliku:
-   ```bash
-   python process_krs_dump.py /sciezka/do/pobranego_pliku.csv --sep ";"
-   ```
-4. Skrypt wyodrębni spółki tartaczne i zapisze je do pliku `tartaki_krs.csv`.
-5. Odśwież Dashboard w przeglądarce. Aplikacja automatycznie załaduje i połączy dane z obu plików (CEIDG i KRS).
-
-## Technical Details
-
-**CEIDG API v3 Data Sourcing:**
-* The script targets the `/firmy` endpoint to get a list of candidate companies using specific PKD codes (e.g., 1610Z = 2007 standard, 1611Z = 2025 standard).
-* It then uses the `/firma` endpoint to fetch detailed data. This endpoint has a hidden limit of maximum 5 IDs per request, which the script handles by batching requests.
-* Only companies whose *main* PKD code (pkdGlowny) matches the target list are saved.
-* **Rate Limiting**: The API allows 50 requests / 3 minutes and 1000 requests / 60 minutes. The script waits ~3.7 seconds between requests to safely stay under limits. If a 403 or 429 is encountered, it sleeps for 185 seconds.
-* **Resilience**:
-  * State is continuously saved to `ceidg_state.json`. If interrupted (e.g. `Ctrl+C`), you can safely restart it to resume without duplicating work.
-  * Server errors (5xx) are retried up to 5 times with exponential backoff.
-  * Duplicate filtering runs on IDs present in both the state file and the CSV.
-* **Data Flattening**: The nested JSON data from the API is flattened into dot-notation columns (e.g., `detail.adresDzialalnosci.wojewodztwo`) for easier visualization in the CSV. Long arrays are dumped as JSON strings.
+### KRS (Spółki)
+KRS fetching is a two-step process (Discovery + Verification).
+```bash
+cd src/krs_scraper
+../../venv/bin/python proxy_discover_all.py
+../../venv/bin/python krs_tartaki.py verify --input ../../data/processed/all_candidates.csv --output ../../data/processed/tartaki_full.csv --errors ../../data/processed/errors_full.csv --save-raw-dir ../../data/raw/raw_krs --resume
+```

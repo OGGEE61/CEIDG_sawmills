@@ -17,7 +17,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 with socketserver.TCPServer(("", PORT), Handler) as httpd:
-    print(f"Server started at http://localhost:{PORT}")
+    print(f"Server started at http://localhost:{PORT}/src/dashboard/index.html")
     print("Press Ctrl+C to stop.")
     try:
         httpd.serve_forever()
